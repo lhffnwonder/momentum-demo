@@ -9,7 +9,6 @@ env/
 .venv/
 env.bak/
 data/
-results/
 output/
 logs/
 .vscode/

@@ -1,0 +1,9 @@
+metric,value
+n_days,918.0
+cumulative_return,0.5242585146889582
+annualized_return,0.12266811543262324
+annualized_vol,0.11031410825476037
+sharpe,1.1119893672106964
+max_drawdown,-0.1099975312849929
+trade_days,30.0
+win_rate,0.551663747809892
