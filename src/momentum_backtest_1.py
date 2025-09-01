@@ -1,4 +1,5 @@
 # momentum_backtest.py
+# 交易成本不影响动量策略的结果
 import yfinance as yf
 import pandas as pd
 import numpy as np
@@ -8,21 +9,31 @@ from datetime import datetime
 from pathlib import Path
 import os
 
-# 1) 自动寻找已有的 results 目录（从 cwd 向上查找）
-def find_results_dir(start: Path = Path.cwd()) -> Path:
-    if (start / "results").is_dir():
-        return start / "results"
-    for p in start.parents:
-        if (p / "results").is_dir():
-            return p / "results"
-    # 找不到就返回 cwd/results（后面会创建）
-    return start / "results"
+# ----------------- 简单工具函数 ----------------
+def ensure_dir(path: Path):
+    path.mkdir(parents=True, exist_ok=True)
 
 if __name__ == "__main__":
-    results_dir = find_results_dir()
-    results_dir.mkdir(parents=True, exist_ok=True)  # 确保存在
+    # --------------- 路径与结果目录 ---------------
+    # ---- 更稳妥地确定 results 目录（替换原来的 Path.cwd() 版本） ----
+    # 目标：把结果保存在项目的 momentum-demo/results/ 下，而不是当前工作目录。
+    script_path = Path(__file__).resolve()     # 脚本文件的绝对路径
+    script_dir  = script_path.parent            # 脚本所在目录（比如 .../momentum-demo/src 或 .../momentum-demo）
 
-    print("当前工作目录 (cwd):", Path.cwd())
+    # 如果脚本位于 src/，则把项目根设为 src 的父目录；否则把项目根设为脚本所在目录
+    if script_dir.name.lower() == "src":
+        project_root = script_dir.parent
+    else:
+        project_root = script_dir
+
+    # 最终 results 目录在 project_root/results
+    results_dir = project_root / "results"
+    ensure_dir(results_dir)
+
+    # 打印信息，方便调试（可删）
+    print("脚本文件位置:", script_path)
+    print("脚本所在目录:", script_dir)
+    print("推断的项目根目录:", project_root)
     print("选定的 results 目录:", results_dir)
     print("results 目录存在且可写?:", os.access(results_dir, os.W_OK))
 
@@ -89,22 +100,22 @@ if __name__ == "__main__":
     print("胜率（持仓期间的正日收益占比）: {:.2%}".format(win_rate))
 
     # ------------- 保存结果 -------------
-    df.to_csv("results/daily_results.csv")
+    df.to_csv(results_dir / "daily_results_no_tc.csv")
     pd.DataFrame({
         'metric': ['n_days', 'cumulative_return', 'annualized_return', 'annualized_vol', 'sharpe', 'max_drawdown', 'trade_days', 'win_rate'],
         'value': [n_days, cumulative_return, annualized_return, ann_vol, sharpe, max_drawdown, trade_days, win_rate]
-    }).to_csv("results/summary_metrics.csv", index=False)
+    }).to_csv(results_dir / "summary_metrics_no_tc.csv", index=False)
 
     # ------------- 绘制折线图：动量策略 VS 市场基准（不考虑交易成本）-------------
     plt.figure(figsize=(10,6))
-    plt.plot(df.index, df['wealth_market'], label='Market (Buy&Hold)')
-    plt.plot(df.index, df['wealth_strategy'], label='Momentum Strategy')
+    plt.plot(df.index, df['wealth_market'], label='Market (Buy&Hold)') # type: ignore
+    plt.plot(df.index, df['wealth_strategy'], label='Momentum Strategy') # type: ignore
     plt.legend()
-    plt.title(f"{TICKER} Momentum Strategy vs Market")
+    plt.title(f"{TICKER} Momentum Strategy vs Market (Without Transaction Cost)")
     plt.ylabel("Wealth Index (start=1)")
     plt.xlabel("Date")
     plt.grid(True)
-    plt.savefig("results/performance.png", dpi=150)
+    plt.savefig(results_dir / "performance_no_tc.png", dpi=150)
     plt.close()
 
     # ------------- (2) 考虑交易成本 -------------
