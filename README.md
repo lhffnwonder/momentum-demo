@@ -4,14 +4,20 @@
 实现一个最小可复现的日频动量回测示例 (TICKER = SPY, WINDOW = 20)
 
 ## 运行
-1. 建议创建虚拟环境
-`python -m venv venv`
-`source venv/bin/activate`
-`pip install -r requirements.txt` <br>
+1. 创建虚拟环境
+```
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+<br>
     或 创建一个新的conda环境
-`conda create -n momentum python=3.12`
-`conda activate momentum`
-`pip install -r requirements.txt`
+
+```
+conda create -n momentum python=3.12
+conda activate momentum
+pip install -r requirements.txt
+```
 
 2. 运行
 若考虑交易成本时不影响动量策略结果，则运行 `momentum_backtest_1.py`；若考虑交易成本时影响动量策略结果，则运行 `momentum_backtest_2.py` (两者均位于 `src\`) <br>
