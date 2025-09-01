@@ -1,4 +1,4 @@
-# Daily Momentum Backtest (demo)
+# 日频动量回测 (demo)
 
 ## 目标
 实现一个最小可复现的日频动量回测示例 (TICKER = SPY, WINDOW = 20)
