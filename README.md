@@ -10,8 +10,8 @@ python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 ```
-<br>
-    或 创建一个新的conda环境
+
+或 创建一个新的conda环境
 
 ```
 conda create -n momentum python=3.12
@@ -21,9 +21,9 @@ pip install -r requirements.txt
 
 2. 运行
 若考虑交易成本时不影响动量策略结果，则运行 `momentum_backtest_1.py`；若考虑交易成本时影响动量策略结果，则运行 `momentum_backtest_2.py` (两者均位于 `src\`) <br>
-    或 打开演示文本 `momentum-demo.ipynb` (位于`notebooks/`)
+    或 打开演示文件 `momentum-demo.ipynb` (位于`notebooks/`)
 
-3. 结果位于 `results/`，分为 `daily_results.csv`（每日记录）、`summary_metrics.csv`（总览指标）、`performance.png`（累计净值对比图）
+3. 结果位于 `results/`，分为 `daily_results.csv`（每日记录）、`summary_metrics.csv`（总览指标）、`performance.png`（累计净值对比图）三类，每类都有“不考虑交易成本”、“考虑交易成本”、“考虑交易成本且修改动量策略”三种情况
 
 ## 主要假设
 - 无杠杆、无借贷；仓位为 0 或 100%（等权）；  
