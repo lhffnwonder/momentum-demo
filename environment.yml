@@ -1,0 +1,13 @@
+name: momentum-env
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - pandas
+  - numpy
+  - matplotlib
+  - jupyterlab
+  - pip
+  - pip:
+    - yfinance
+    - ipykernel

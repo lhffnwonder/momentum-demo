@@ -8,8 +8,6 @@ venv/
 env/
 .venv/
 env.bak/
-.ipynb_checkpoints/
-*.ipynb
 data/
 results/
 output/
