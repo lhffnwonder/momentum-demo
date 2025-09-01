@@ -35,8 +35,11 @@ if __name__ == "__main__":
     # ------------- 拉数据 -------------
     df = yf.download(TICKER, start=START, end=END, progress=False)
     # 简单检查
-    print("Rows of data:", len(df)) # type: ignore
+    print("样本行数：", len(df)) # type: ignore
     df = df[['Close']].dropna() # type: ignore
+    # 确保按时间升序
+    df.sort_index(inplace=True)
+    print("样本时间范围:", df.index.min(), "->", df.index.max()) # type: ignore
 
     # ------------- 计算信号（简单动量）-------------
     # 计算过去 WINDOW 天的收益率（收盘价比）
@@ -46,6 +49,9 @@ if __name__ == "__main__":
     # 我们避免未来函数（用今天的 signal 去决定明天的持仓）
     df['signal_shift'] = df['signal'].shift(1).fillna(0)
 
+    # ------------- (1) 不考虑交易成本 -------------
+    print("\n")
+    print("不考虑交易成本：")
     # ------------- 计算每日回报 -------------
     df['ret_daily'] = df['Close'].pct_change().fillna(0)
     # 策略回报（简单：无杠杆、全仓/空仓）
@@ -69,10 +75,11 @@ if __name__ == "__main__":
     max_drawdown = drawdown.min()
 
     # 胜率 & 交易次数
-    trade_days = df['signal_shift'].diff().abs().sum() / 2  # type: ignore # 粗略估计换仓次数
+    transitions = int((df['signal_shift'] != df['signal_shift'].shift(1)).sum())  # type: ignore # 包含从 NaN->value 的变化
+    trade_days = transitions // 2  # type: ignore # 粗略估计换仓次数
+    position_days = int((df['signal_shift'] != 0).sum()) # type: ignore
     win_rate = (df.loc[df['strat_ret'] > 0, 'strat_ret'].count()) / (df.loc[df['signal_shift'] != 0, 'strat_ret'].count()+1e-9)
 
-    print("样本行数:", n_days)
     print("累计收益 (strategy): {:.2%}".format(cumulative_return))
     print("年化收益: {:.2%}".format(annualized_return))
     print("年化波动: {:.2%}".format(ann_vol))
@@ -88,7 +95,7 @@ if __name__ == "__main__":
         'value': [n_days, cumulative_return, annualized_return, ann_vol, sharpe, max_drawdown, trade_days, win_rate]
     }).to_csv("results/summary_metrics.csv", index=False)
 
-    # ------------- 绘图 -------------
+    # ------------- 绘制折线图：动量策略 VS 市场基准（不考虑交易成本）-------------
     plt.figure(figsize=(10,6))
     plt.plot(df.index, df['wealth_market'], label='Market (Buy&Hold)')
     plt.plot(df.index, df['wealth_strategy'], label='Momentum Strategy')
@@ -98,4 +105,69 @@ if __name__ == "__main__":
     plt.xlabel("Date")
     plt.grid(True)
     plt.savefig("results/performance.png", dpi=150)
+    plt.close()
+
+    # ------------- (2) 考虑交易成本 -------------
+    print("")
+    print("考虑交易成本：")
+    # ------------- 计算每日回报 -------------
+    # 每次换仓时扣 transaction cost（简单模型）
+    tc = 0.0005
+    df['trade'] = df['signal_shift'].diff().abs()  # type: ignore # 1 表示换仓
+    df['strat_ret_net'] = df['strat_ret'] - df['trade'] * tc # type: ignore
+    # 然后用 strat_ret_net 计算 wealth
+
+    # ------------- 计算累计净值（wealth index）-------------
+    df['wealth_strategy_net'] = (1 + df['strat_ret_net']).cumprod()
+
+    # ------------- 绩效指标 -------------
+    try:
+        cumulative_return_net = df['wealth_strategy_net'].iloc[-1] - 1 # type: ignore
+    except IndexError:
+        cumulative_return_net = np.nan
+
+    # 更稳妥的年化收益（基于日收益的几何平均）
+    if n_days > 0 and not df['strat_ret_net'].isna().all(): # type: ignore
+        annualized_return_net = np.expm1(df['strat_ret_net'].mean() * TRADING_DAYS) # type: ignore
+    else:
+        annualized_return_net = np.nan
+
+    # 年化波动，明确 ddof（这里选 ddof=0）
+    ann_vol_net = df['strat_ret_net'].std(ddof=0) * np.sqrt(TRADING_DAYS) if n_days > 0 else np.nan # type: ignore
+    sharpe_net = (annualized_return_net / ann_vol_net) if (ann_vol_net and not np.isnan(ann_vol_net)) else np.nan
+
+    # ------------- 最大回撤 -------------
+    rolling_max_net = df['wealth_strategy_net'].cummax() # type: ignore
+    max_drawdown_net = (df['wealth_strategy_net'] / rolling_max_net - 1).min() # type: ignore
+
+    # ------------- 胜率 & 交易次数 -------------
+    trade_days = transitions // 2  # type: ignore # 粗略估计换仓次数
+    win_rate_net = (df.loc[df['strat_ret_net'] > 0, 'strat_ret_net'].count()) / (df.loc[df['signal_shift'] != 0, 'strat_ret_net'].count()+1e-9) # type: ignore
+
+    print("净累计收益 (strategy): {:.2%}".format(cumulative_return_net))
+    print("净年化收益: {:.2%}".format(annualized_return_net))
+    print("净年化波动: {:.2%}".format(ann_vol_net))
+    print("净夏普指数Sharpe (rf=0): {:.2f}".format(sharpe_net))
+    print("净最大回撤:", f"{max_drawdown_net:.2%}" if not np.isnan(max_drawdown_net) else "nan")
+    print("交易次数（transitions）:", trade_days)
+    print("持仓天数:", position_days)
+    print("净胜率（持仓期间的正日收益占比）: {:.2%}".format(win_rate_net))
+
+    # ------------- 保存结果 -------------
+    df.to_csv(results_dir / "daily_results_tc.csv", index=True) # type: ignore
+    pd.DataFrame({
+        'metric': ['n_days', 'cumulative_return', 'annualized_return', 'annualized_vol', 'sharpe', 'max_drawdown', 'trade_days', 'win_rate'],
+        'value': [n_days, cumulative_return, annualized_return, ann_vol, sharpe, max_drawdown, trade_days, win_rate]
+    }).to_csv(results_dir / "summary_metrics_tc.csv", index=False)
+
+    # ------------- 绘制折线图：动量策略 VS 市场基准（考虑交易成本）-------------
+    plt.figure(figsize=(10,6))
+    plt.plot(df.index, df['wealth_market'], label='Market (Buy&Hold)') # type: ignore
+    plt.plot(df.index, df['wealth_strategy'], label='Momentum Strategy') # type: ignore
+    plt.legend()
+    plt.title(f"{TICKER} Momentum Strategy vs Market (With Transaction Cost)")
+    plt.ylabel("Wealth Index (start=1)")
+    plt.xlabel("Date")
+    plt.grid(True)
+    plt.savefig(results_dir / "performance_tc.png", dpi=150)
     plt.close()
